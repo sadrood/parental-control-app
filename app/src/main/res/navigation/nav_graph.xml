@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/parentDashboardFragment">
+
+    <!-- Parent Fragments -->
+    <fragment
+        android:id="@+id/parentDashboardFragment"
+        android:name="com.example.parentalcontrol.ui.parent.dashboard.ParentDashboardFragment"
+        android:label="家长控制中心"
+        tools:layout="@layout/fragment_parent_dashboard">
+        <action
+            android:id="@+id/action_dashboard_to_settings"
+            app:destination="@id/parentSettingsFragment" />
+        <action
+            android:id="@+id/action_dashboard_to_child_home"
+            app:destination="@id/childHomeFragment" />
+        <action
+            android:id="@+id/action_dashboard_to_location"
+            app:destination="@id/parentLocationFragment" />
+        <action
+            android:id="@+id/action_dashboard_to_stats"
+            app:destination="@id/parentStatsFragment" />
+        <action
+            android:id="@+id/action_dashboard_to_profile"
+            app:destination="@id/parentProfileFragment" />
+        <action
+            android:id="@+id/action_dashboard_to_security"
+            app:destination="@id/parentSecurityFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/parentSettingsFragment"
+        android:name="com.example.parentalcontrol.ui.parent.settings.ParentSettingsFragment"
+        android:label="管控设置"
+        tools:layout="@layout/fragment_parent_settings" />
+
+    <fragment
+        android:id="@+id/parentLocationFragment"
+        android:name="com.example.parentalcontrol.ui.parent.location.ParentLocationFragment"
+        android:label="实时位置"
+        tools:layout="@layout/fragment_parent_location" />
+
+    <fragment
+        android:id="@+id/parentStatsFragment"
+        android:name="com.example.parentalcontrol.ui.parent.stats.ParentStatsFragment"
+        android:label="使用统计"
+        tools:layout="@layout/fragment_parent_stats" />
+
+    <fragment
+        android:id="@+id/parentProfileFragment"
+        android:name="com.example.parentalcontrol.ui.parent.profile.ParentProfileFragment"
+        android:label="我的"
+        tools:layout="@layout/fragment_parent_profile" />
+
+    <fragment
+        android:id="@+id/parentSecurityFragment"
+        android:name="com.example.parentalcontrol.ui.parent.security.ParentSecurityFragment"
+        android:label="安全中心"
+        tools:layout="@layout/fragment_parent_security" />
+
+    <!-- Child Fragments -->
+    <fragment
+        android:id="@+id/childHomeFragment"
+        android:name="com.example.parentalcontrol.ui.child.home.ChildHomeFragment"
+        android:label="儿童首页"
+        tools:layout="@layout/fragment_child_home">
+        <action
+            android:id="@+id/action_child_home_to_apps"
+            app:destination="@id/childAppLibraryFragment" />
+        <action
+            android:id="@+id/action_child_home_to_dashboard"
+            app:destination="@id/parentDashboardFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/childAppLibraryFragment"
+        android:name="com.example.parentalcontrol.ui.child.applib.ChildAppLibraryFragment"
+        android:label="应用库"
+        tools:layout="@layout/fragment_child_app_library" />
+
+</navigation>

@@ -1,0 +1,120 @@
+<resources>
+    <string name="app_name">守护星</string>
+    <string name="admin_label">守护星设备管理</string>
+    <string name="admin_description">启用此权限以确保应用正常运行。</string>
+
+    <!-- Navigation -->
+    <string name="nav_dashboard">首页</string>
+    <string name="nav_location">位置</string>
+    <string name="nav_stats">统计</string>
+    <string name="nav_profile">我的</string>
+    <string name="nav_child_home">首页</string>
+    <string name="nav_child_apps">应用库</string>
+    <string name="nav_child_settings">设置</string>
+
+    <!-- Dashboard -->
+    <string name="parent_control_center">守护星</string>
+    <string name="remaining_time_today">今日剩余可用时间</string>
+    <string name="quick_controls">快捷管控</string>
+    <string name="lock_screen">一键锁屏</string>
+    <string name="unlock_now">立即解锁</string>
+    <string name="study_mode">学习模式</string>
+    <string name="today_app_stats">今日应用统计</string>
+    <string name="view_details">查看详情</string>
+    <string name="control_settings">管控设置</string>
+    <string name="security_center">安全中心</string>
+    <string name="online">在线</string>
+    <string name="minutes">分钟</string>
+
+    <!-- Settings -->
+    <string name="parent_control_settings">家长控制设置</string>
+    <string name="time_control">时长管控</string>
+    <string name="daily_time_limit">每日时长限制</string>
+    <string name="daily_time_limit_desc">设置每日可使用设备的总时长</string>
+    <string name="diff_weekday_weekend">区分工作日/周末</string>
+    <string name="app_control">应用管控</string>
+    <string name="manage_whitelist">管理白名单</string>
+    <string name="content_control">内容管控</string>
+    <string name="web_filter">不良网站过滤</string>
+    <string name="youth_mode">短视频青少年模式</string>
+    <string name="time_period_control">时段管控</string>
+    <string name="school_time">学校上课时间</string>
+    <string name="evening_rest">晚间休息时段</string>
+    <string name="forbidden">禁止使用</string>
+    <string name="allowed">允许使用</string>
+    <string name="reset_default">重置默认</string>
+    <string name="save_settings">保存当前设置</string>
+    <string name="unlimited">不限时长</string>
+    <string name="blocked">已禁用</string>
+    <string name="whitelist_app">白名单应用</string>
+
+    <!-- Location -->
+    <string name="realtime_location">实时位置</string>
+    <string name="current_location">当前位置</string>
+    <string name="stay_duration">停留时长</string>
+    <string name="device_status">设备状态</string>
+
+    <!-- Stats -->
+    <string name="usage_stats">使用统计</string>
+    <string name="today_total">今日总计</string>
+    <string name="vs_yesterday">较昨日</string>
+    <string name="weekly_trend">本周趋势</string>
+    <string name="last_7_days">最近7天</string>
+    <string name="app_ranking">应用排行</string>
+
+    <!-- Profile -->
+    <string name="my_profile">我的</string>
+    <string name="personal_info">个人资料</string>
+    <string name="account_security">账号安全</string>
+    <string name="notifications">消息通知</string>
+    <string name="subscription">订阅管理</string>
+    <string name="logout">退出登录</string>
+
+    <!-- Security -->
+    <string name="security_center_title">安全中心</string>
+    <string name="security_score">安全评分</string>
+    <string name="anti_uninstall">防卸载保护</string>
+    <string name="anti_uninstall_desc">开启后无法通过常规方式卸载APP</string>
+    <string name="anti_root">防ROOT检测</string>
+    <string name="anti_root_desc">检测设备是否被非法获取最高权限</string>
+    <string name="time_tamper_proof">时间防篡改</string>
+    <string name="time_tamper_proof_desc">锁定系统时间，防止通过修改时间绕过管控</string>
+    <string name="screenshot_audit">屏幕截图审计</string>
+    <string name="screenshot_audit_desc">定期截取孩子端屏幕，确保内容安全</string>
+    <string name="core_protection">核心防护</string>
+    <string name="advanced_tools">高级工具</string>
+    <string name="fingerprint_lock">指纹锁</string>
+    <string name="remote_reset">远程重置</string>
+    <string name="enabled">已开启</string>
+    <string name="disabled">未开启</string>
+    <string name="safe">安全</string>
+
+    <!-- Child Home -->
+    <string name="remaining_usage_time">今日剩余使用时长</string>
+    <string name="current_period">当前时段：可用</string>
+    <string name="recommended_apps">推荐应用</string>
+    <string name="parent_approved">已通过家长审核</string>
+    <string name="contact_parent">联系家长</string>
+    <string name="arrange_time">剩余使用时长%d分钟，请合理安排时间哦~</string>
+
+    <!-- Child App Library -->
+    <string name="app_library">应用库</string>
+    <string name="search_apps">搜索应用...</string>
+    <string name="featured_apps">精选合规应用</string>
+    <string name="install">安装</string>
+    <string name="request">申请</string>
+    <string name="restricted">受限</string>
+
+    <!-- Common -->
+    <string name="hour">小时</string>
+    <string name="hours">小时</string>
+    <string name="per_day">/日</string>
+    <string name="remaining">剩余</string>
+    <string name="no_data">暂无数据</string>
+    <string name="confirm">确认</string>
+    <string name="cancel">取消</string>
+    <string name="save">保存</string>
+    <string name="delete">删除</string>
+    <string name="edit">编辑</string>
+    <string name="add">添加</string>
+</resources>

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/blocking_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/lock_background"
+    android:fitsSystemWindows="true">
+
+    <!-- 顶部栏 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="?android:attr/actionBarSize"
+        android:background="@color/lock_header"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="家长控制中心"
+            android:textColor="@android:color/white"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvBlockReason"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="使用时间已到"
+            android:textColor="@color/lock_accent"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <!-- 内容区域 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="?android:attr/actionBarSize"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="32dp">
+
+        <!-- 锁图标 -->
+        <TextView
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:gravity="center"
+            android:text="🔒"
+            android:textSize="48sp" />
+
+        <!-- 提示文字 -->
+        <TextView
+            android:id="@+id/tvBlockMessage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="今日使用时间已用完"
+            android:textColor="@android:color/white"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvBlockSubMessage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="请合理安排时间，明天再来吧！"
+            android:textColor="@color/lock_subtext"
+            android:textSize="14sp" />
+
+        <!-- 剩余时间显示 -->
+        <TextView
+            android:id="@+id/tvTimeInfo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:textColor="@color/lock_info"
+            android:textSize="16sp" />
+
+        <!-- 联系家长按钮 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnContactParent"
+            android:layout_width="200dp"
+            android:layout_height="48dp"
+            android:layout_marginTop="32dp"
+            android:text="联系家长"
+            android:textSize="16sp" />
+    </LinearLayout>
+
+</FrameLayout>

@@ -1,0 +1,28 @@
+buildscript {
+    ext.kotlin_version = '2.0.21' // 最新稳定版，你的Studio完美支持
+    repositories {
+        // 优先阿里云镜像，解决国内下载问题
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/central' }
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        // AGP 8.1.0 可以搭配 Kotlin 2.0+
+        classpath 'com.android.tools.build:gradle:8.13.2'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+allprojects {
+    repositories {
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/central' }
+        google()
+        mavenCentral()
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
