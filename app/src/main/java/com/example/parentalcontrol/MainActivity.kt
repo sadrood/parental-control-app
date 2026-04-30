@@ -119,12 +119,17 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
         }
 
-        val childPermissions = arrayOf(
+        val childPermissions = mutableListOf(
             Manifest.permission.CALL_PHONE,
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION
         )
-        requestRuntimePermissions(childPermissions)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            childPermissions.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+
+        requestRuntimePermissions(childPermissions.toTypedArray())
     }
 
     private fun requestParentPermissions() {

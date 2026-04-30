@@ -66,7 +66,7 @@ class SettingsManager(context: Context) {
         set(value) = prefs.edit().putBoolean(KEY_STUDY_MODE, value).apply()
 
     var childName: String
-        get() = prefs.getString(KEY_CHILD_NAME, "小明") ?: "小明"
+        get() = prefs.getString(KEY_CHILD_NAME, "") ?: ""
         set(value) = prefs.edit().putString(KEY_CHILD_NAME, value).apply()
 
     var parentName: String

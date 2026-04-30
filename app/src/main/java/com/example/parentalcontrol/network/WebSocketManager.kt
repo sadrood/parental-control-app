@@ -98,10 +98,11 @@ class WebSocketManager private constructor() {
 
         reconnectCount++
         if (reconnectCount <= MAX_RECONNECT_ATTEMPTS) {
-            Log.d(TAG, "第 $reconnectCount/$MAX_RECONNECT_ATTEMPTS 次重连，${RECONNECT_DELAY_MS}ms后重试")
+            val delay = RECONNECT_DELAY_MS * (1 shl (reconnectCount - 1))
+            Log.d(TAG, "第 $reconnectCount/$MAX_RECONNECT_ATTEMPTS 次重连，${delay}ms后重试（指数退避）")
             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                 doConnect()
-            }, RECONNECT_DELAY_MS)
+            }, delay)
         } else {
             Log.e(TAG, "超过最大重连次数 ($MAX_RECONNECT_ATTEMPTS)，停止重连")
             _events.tryEmit(SocketEvent.ConnectionError("连接失败，已重试 $MAX_RECONNECT_ATTEMPTS 次"))
@@ -148,85 +149,136 @@ class WebSocketManager private constructor() {
     private fun setupListeners() {
         socket?.apply {
             on(Socket.EVENT_CONNECT) {
-                Log.d(TAG, "连接成功")
-                isConnected = true
-                _events.tryEmit(SocketEvent.Connected)
-                currentUserId?.let { uid ->
-                    currentToken?.let { tk -> doBindUser(uid, tk) }
+                try {
+                    Log.d(TAG, "连接成功")
+                    isConnected = true
+                    _events.tryEmit(SocketEvent.Connected)
+                    currentUserId?.let { uid ->
+                        currentToken?.let { tk -> doBindUser(uid, tk) }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "处理连接成功事件异常", e)
                 }
             }
 
             on(Socket.EVENT_CONNECT_ERROR) { args ->
-                val error = args.firstOrNull()?.toString() ?: "未知错误"
-                Log.e(TAG, "连接失败: $error")
-                handleConnectionError(error)
+                try {
+                    val error = args.firstOrNull()?.toString() ?: "未知错误"
+                    Log.e(TAG, "连接失败: $error")
+                    handleConnectionError(error)
+                } catch (e: Exception) {
+                    Log.e(TAG, "处理连接失败事件异常", e)
+                }
             }
 
             on(Socket.EVENT_DISCONNECT) {
-                Log.d(TAG, "连接断开")
-                isConnected = false
-                _events.tryEmit(SocketEvent.Disconnected)
+                try {
+                    Log.d(TAG, "连接断开")
+                    isConnected = false
+                    _events.tryEmit(SocketEvent.Disconnected)
+                } catch (e: Exception) {
+                    Log.e(TAG, "处理断开事件异常", e)
+                }
             }
 
             on("bind_success") { args ->
-                val data = args.firstOrNull() as? JSONObject
-                val userId = data?.optString("userId", "") ?: ""
-                Log.d(TAG, "绑定成功: $userId")
-                _events.tryEmit(SocketEvent.BindSuccess(userId))
+                try {
+                    val data = args.firstOrNull() as? JSONObject
+                    val userId = data?.optString("userId", "") ?: ""
+                    Log.d(TAG, "绑定成功: $userId")
+                    _events.tryEmit(SocketEvent.BindSuccess(userId))
+                } catch (e: Exception) {
+                    Log.e(TAG, "处理绑定成功事件异常", e)
+                }
             }
 
             on("bind_error") { args ->
-                val data = args.firstOrNull() as? JSONObject
-                val error = data?.optString("error", "绑定失败") ?: "绑定失败"
-                Log.e(TAG, "绑定失败: $error")
-                _events.tryEmit(SocketEvent.BindError(error))
+                try {
+                    val data = args.firstOrNull() as? JSONObject
+                    val error = data?.optString("error", "绑定失败") ?: "绑定失败"
+                    Log.e(TAG, "绑定失败: $error")
+                    _events.tryEmit(SocketEvent.BindError(error))
+                } catch (e: Exception) {
+                    Log.e(TAG, "处理绑定失败事件异常", e)
+                }
             }
 
-            // 业务事件
             on("rule_update") { args ->
-                val data = args.firstOrNull()?.toString() ?: "{}"
-                Log.d(TAG, "收到规则更新: $data")
-                _events.tryEmit(SocketEvent.RuleUpdate(data))
+                try {
+                    val data = args.firstOrNull()?.toString() ?: "{}"
+                    Log.d(TAG, "收到规则更新: $data")
+                    _events.tryEmit(SocketEvent.RuleUpdate(data))
+                } catch (e: Exception) {
+                    Log.e(TAG, "解析规则更新失败", e)
+                }
             }
 
             on("rule_delete") { args ->
-                val data = args.firstOrNull()?.toString() ?: "{}"
-                Log.d(TAG, "收到规则删除: $data")
-                _events.tryEmit(SocketEvent.RuleDelete(data))
+                try {
+                    val data = args.firstOrNull()?.toString() ?: "{}"
+                    Log.d(TAG, "收到规则删除: $data")
+                    _events.tryEmit(SocketEvent.RuleDelete(data))
+                } catch (e: Exception) {
+                    Log.e(TAG, "解析规则删除失败", e)
+                }
             }
 
             on("time_rule_update") { args ->
-                val data = args.firstOrNull()?.toString() ?: "{}"
-                Log.d(TAG, "收到时间规则更新: $data")
-                _events.tryEmit(SocketEvent.TimeRuleUpdate(data))
+                try {
+                    val data = args.firstOrNull()?.toString() ?: "{}"
+                    Log.d(TAG, "收到时间规则更新: $data")
+                    _events.tryEmit(SocketEvent.TimeRuleUpdate(data))
+                } catch (e: Exception) {
+                    Log.e(TAG, "解析时间规则更新失败", e)
+                }
             }
 
             on("lock_screen") { args ->
-                val data = args.firstOrNull()?.toString() ?: "{}"
-                Log.d(TAG, "收到锁屏指令: $data")
-                _events.tryEmit(SocketEvent.LockScreen(data))
+                try {
+                    val data = args.firstOrNull()?.toString() ?: "{}"
+                    Log.d(TAG, "收到锁屏指令: $data")
+                    _events.tryEmit(SocketEvent.LockScreen(data))
+                } catch (e: Exception) {
+                    Log.e(TAG, "解析锁屏指令失败", e)
+                }
             }
 
             on("unlock_screen") {
-                Log.d(TAG, "收到解锁指令")
-                _events.tryEmit(SocketEvent.UnlockScreen)
+                try {
+                    Log.d(TAG, "收到解锁指令")
+                    _events.tryEmit(SocketEvent.UnlockScreen)
+                } catch (e: Exception) {
+                    Log.e(TAG, "处理解锁指令失败", e)
+                }
             }
 
             on("usage_update") { args ->
-                val data = args.firstOrNull()?.toString() ?: "{}"
-                Log.d(TAG, "收到使用记录更新: $data")
-                _events.tryEmit(SocketEvent.UsageUpdate(data))
+                try {
+                    val data = args.firstOrNull()?.toString() ?: "{}"
+                    Log.d(TAG, "收到使用记录更新: $data")
+                    _events.tryEmit(SocketEvent.UsageUpdate(data))
+                } catch (e: Exception) {
+                    Log.e(TAG, "解析使用记录更新失败", e)
+                }
             }
 
             on("security_event") { args ->
-                val data = args.firstOrNull()?.toString() ?: "{}"
-                Log.d(TAG, "收到安全事件: $data")
-                _events.tryEmit(SocketEvent.SecurityEvent(data))
+                try {
+                    val data = args.firstOrNull()?.toString() ?: "{}"
+                    Log.d(TAG, "收到安全事件: $data")
+                    _events.tryEmit(SocketEvent.SecurityEvent(data))
+                } catch (e: Exception) {
+                    Log.e(TAG, "解析安全事件失败", e)
+                }
             }
 
             on("sync_request") {
-                Log.d(TAG, "收到同步请求")
-                _events.tryEmit(SocketEvent.SyncRequest)
+                try {
+                    Log.d(TAG, "收到同步请求")
+                    _events.tryEmit(SocketEvent.SyncRequest)
+                } catch (e: Exception) {
+                    Log.e(TAG, "处理同步请求失败", e)
+                }
             }
         }
     }

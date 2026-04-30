@@ -11,19 +11,19 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.example.parentalcontrol.R
 import com.example.parentalcontrol.data.db.AppDatabase
 import com.example.parentalcontrol.data.repository.AppRepository
 import com.example.parentalcontrol.databinding.FragmentParentDashboardBinding
+import com.example.parentalcontrol.model.AppUsage
 import com.example.parentalcontrol.network.AuthManager
 import com.example.parentalcontrol.receiver.AdminReceiver
+import com.example.parentalcontrol.ui.parent.stats.UsageStatsViewModel
 import com.example.parentalcontrol.util.SettingsManager
-import com.example.parentalcontrol.util.TimeChecker
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class ParentDashboardFragment : Fragment() {
 
@@ -34,6 +34,7 @@ class ParentDashboardFragment : Fragment() {
     private lateinit var devicePolicyManager: DevicePolicyManager
     private lateinit var adminComponent: ComponentName
     private lateinit var authManager: AuthManager
+    private lateinit var usageStatsViewModel: UsageStatsViewModel
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentParentDashboardBinding.inflate(inflater, container, false)
@@ -49,6 +50,7 @@ class ParentDashboardFragment : Fragment() {
         devicePolicyManager = requireActivity().getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
         adminComponent = ComponentName(requireContext(), AdminReceiver::class.java)
         authManager = AuthManager.getInstance(requireContext())
+        usageStatsViewModel = ViewModelProvider(requireActivity())[UsageStatsViewModel::class.java]
 
         setupViews()
         setupClickListeners()
@@ -127,20 +129,22 @@ class ParentDashboardFragment : Fragment() {
     }
 
     private fun observeData() {
-        lifecycleScope.launch(Dispatchers.IO) {
-            val todayTotal = repository.getTodayTotalUsage()
-            val dailyLimit = settingsManager.dailyTimeLimit
-            val remaining = TimeChecker.getRemainingTimeToday(dailyLimit, todayTotal)
+        usageStatsViewModel.remainingTime.observe(viewLifecycleOwner) { remainingMinutes ->
+            binding.tvRemainingTime.text = "$remainingMinutes"
+            binding.tvRemainingUnit.text = "分钟"
+        }
 
-            withContext(Dispatchers.Main) {
-                binding.tvRemainingTime.text = "$remaining"
-                binding.tvRemainingUnit.text = "分钟"
+        usageStatsViewModel.appUsageStats.observe(viewLifecycleOwner) { apps ->
+            if (apps.isNotEmpty()) {
+                updateAppStatsFromUsageManager(apps)
             }
         }
 
         lifecycleScope.launch {
             repository.getDailyAppUsage().collect { usageList ->
-                updateAppStats(usageList)
+                if (usageList.isNotEmpty()) {
+                    updateAppStats(usageList)
+                }
             }
         }
     }
@@ -162,17 +166,56 @@ class ParentDashboardFragment : Fragment() {
         val studyApps = usageList.filter { it.category == "教育" || it.category == "学习" }
         val socialApps = usageList.filter { it.category == "社交" }
 
-        val gameMinutes = gameApps.sumOf { it.usageTimeMs } / 60000
-        val studyMinutes = studyApps.sumOf { it.usageTimeMs } / 60000
-        val socialMinutes = socialApps.sumOf { it.usageTimeMs } / 60000
+        applyCategoryStats(gameApps.sumOf { it.usageTimeMs }, studyApps.sumOf { it.usageTimeMs }, socialApps.sumOf { it.usageTimeMs }, totalUsage)
+    }
+
+    private fun updateAppStatsFromUsageManager(apps: List<AppUsage>) {
+        val pm = requireContext().packageManager
+        val totalUsage = apps.sumOf { it.usageTime }.coerceAtLeast(1)
+
+        var gameMs = 0L
+        var studyMs = 0L
+        var socialMs = 0L
+
+        for (app in apps) {
+            val appName = try {
+                pm.getApplicationLabel(pm.getApplicationInfo(app.packageName, 0)).toString()
+            } catch (e: Exception) {
+                app.packageName
+            }
+            val category = categorizePackage(app.packageName, appName)
+            when (category) {
+                "游戏", "娱乐" -> gameMs += app.usageTime
+                "教育", "学习" -> studyMs += app.usageTime
+                "社交" -> socialMs += app.usageTime
+            }
+        }
+
+        applyCategoryStats(gameMs, studyMs, socialMs, totalUsage)
+    }
+
+    private fun applyCategoryStats(gameMs: Long, studyMs: Long, socialMs: Long, totalMs: Long) {
+        val gameMinutes = gameMs / 60000
+        val studyMinutes = studyMs / 60000
+        val socialMinutes = socialMs / 60000
 
         binding.tvGameTime.text = "${gameMinutes}m"
         binding.tvStudyTime.text = "${studyMinutes}m"
         binding.tvSocialTime.text = "${socialMinutes}m"
 
-        binding.progressGame.progress = ((gameApps.sumOf { it.usageTimeMs } * 100 / totalUsage).toInt())
-        binding.progressStudy.progress = ((studyApps.sumOf { it.usageTimeMs } * 100 / totalUsage).toInt())
-        binding.progressSocial.progress = ((socialApps.sumOf { it.usageTimeMs } * 100 / totalUsage).toInt())
+        binding.progressGame.progress = ((gameMs * 100 / totalMs).toInt())
+        binding.progressStudy.progress = ((studyMs * 100 / totalMs).toInt())
+        binding.progressSocial.progress = ((socialMs * 100 / totalMs).toInt())
+    }
+
+    private fun categorizePackage(packageName: String, appName: String): String {
+        val lower = "$packageName $appName".lowercase()
+        return when {
+            lower.contains("game") || lower.contains("tencent") || lower.contains("video") || lower.contains("player") || lower.contains("bilibili") || lower.contains("youtube") -> "娱乐"
+            lower.contains("edu") || lower.contains("study") || lower.contains("homework") || lower.contains("learn") || lower.contains("class") -> "学习"
+            lower.contains("wechat") || lower.contains("qq") || lower.contains("tiktok") || lower.contains("douyin") || lower.contains("xiaohongshu") || lower.contains("weibo") -> "社交"
+            else -> "其他"
+        }
     }
 
     private fun requestAdminPermission() {
