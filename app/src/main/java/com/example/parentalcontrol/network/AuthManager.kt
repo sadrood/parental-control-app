@@ -23,6 +23,9 @@ class AuthManager private constructor(private val context: Context) {
         private const val KEY_TOKEN = "token"
         private const val KEY_ROLE = "role"
         private const val KEY_PAIRED_WITH = "paired_with"
+        private const val KEY_PAIRING_CODE = "pairing_code"
+        private const val KEY_IS_PAIRED = "is_paired"
+        private const val KEY_IS_SETUP_COMPLETE = "is_setup_complete"
 
         @Volatile
         private var instance: AuthManager? = null
@@ -62,14 +65,28 @@ class AuthManager private constructor(private val context: Context) {
         val token = prefs.getString(KEY_TOKEN, null)
         val role = prefs.getString(KEY_ROLE, null)
         val pairedWith = prefs.getString(KEY_PAIRED_WITH, null)
+        val pairingCode = prefs.getString(KEY_PAIRING_CODE, null)
+        val isPairedSaved = prefs.getBoolean(KEY_IS_PAIRED, false)
 
         if (userId != null && token != null && role != null) {
             _currentUser.value = User(userId, role, token, pairedWith)
-            _isPaired.value = pairedWith != null
+            _isPaired.value = isPairedSaved || pairedWith != null
+            _pairingCode.value = pairingCode
             ApiClient.authToken = token
-            Log.d(TAG, "会话已恢复: $userId, role=$role, paired=$pairedWith")
+            Log.d(TAG, "会话已恢复: $userId, role=$role, paired=${_isPaired.value}, pairedWith=$pairedWith, pairingCode=$pairingCode")
         }
     }
+
+    fun isSetupComplete(): Boolean = prefs.getBoolean(KEY_IS_SETUP_COMPLETE, false)
+
+    fun setSetupComplete() {
+        prefs.edit().putBoolean(KEY_IS_SETUP_COMPLETE, true).apply()
+    }
+
+    /**
+     * 获取已配对设备的用户ID
+     */
+    fun getPairedWithUserId(): String? = prefs.getString(KEY_PAIRED_WITH, null)
 
     /**
      * 匿名登录
@@ -93,12 +110,16 @@ class AuthManager private constructor(private val context: Context) {
                 val userId = body.user?.id ?: return@withContext Result.failure(Exception("用户ID为空"))
                 val role = body.user?.role ?: return@withContext Result.failure(Exception("角色为空"))
                 val token = body.token ?: return@withContext Result.failure(Exception("令牌为空"))
-                
-                prefs.edit()
+                val pairingCode = body.pairingCode
+
+                val editor = prefs.edit()
                     .putString(KEY_USER_ID, userId)
                     .putString(KEY_TOKEN, token)
                     .putString(KEY_ROLE, role)
-                    .apply()
+                if (pairingCode != null) {
+                    editor.putString(KEY_PAIRING_CODE, pairingCode)
+                }
+                editor.apply()
 
                 val user = User(
                     id = userId,
@@ -147,6 +168,8 @@ class AuthManager private constructor(private val context: Context) {
 
                 prefs.edit()
                     .putString(KEY_PAIRED_WITH, body.parentId)
+                    .putBoolean(KEY_IS_PAIRED, true)
+                    .putBoolean(KEY_IS_SETUP_COMPLETE, true)
                     .apply()
 
                 _currentUser.value = _currentUser.value?.copy(pairedWith = body.parentId)
@@ -154,7 +177,7 @@ class AuthManager private constructor(private val context: Context) {
 
                 Log.d(TAG, "儿童链接成功: parentId=${body.parentId}")
                 Result.success(PairResult(
-                    familyId = "",
+                    familyId = body.familyId ?: "",
                     childId = childId
                 ))
             } else {
@@ -187,6 +210,8 @@ class AuthManager private constructor(private val context: Context) {
 
                 prefs.edit()
                     .putString(KEY_PAIRED_WITH, body.childId)
+                    .putBoolean(KEY_IS_PAIRED, true)
+                    .putBoolean(KEY_IS_SETUP_COMPLETE, true)
                     .apply()
 
                 _currentUser.value = _currentUser.value?.copy(pairedWith = body.childId)

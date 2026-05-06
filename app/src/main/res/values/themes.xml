@@ -1,11 +1,17 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <style name="Theme.ParentalControl" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <!-- 使用 MaterialComponents (MDC/Material 2) 主题，兼容性更好，不依赖 M3 系统资源 -->
+    <style name="Theme.ParentalControl" parent="Theme.MaterialComponents.Light.NoActionBar">
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryVariant">@color/primary_dark</item>
         <item name="colorOnPrimary">@color/white</item>
-        <item name="colorSecondary">@color/mint</item>
-        <item name="colorSecondaryVariant">@color/mint_dark</item>
+        <item name="colorSecondary">@color/green</item>
+        <item name="colorSecondaryVariant">@color/green_dark</item>
         <item name="colorOnSecondary">@color/white</item>
+        <item name="android:colorBackground">@color/white</item>
+        <item name="colorSurface">@color/white</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorError">@color/danger</item>
+        <item name="colorOnError">@color/white</item>
         <item name="android:statusBarColor">@color/white</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:navigationBarColor">@color/white</item>
@@ -50,12 +56,7 @@
         <item name="android:textStyle">bold</item>
     </style>
 
-    <style name="CardSubtitle" parent="TextAppearance.MaterialComponents.Caption">
+    <style name="CardSubtitle" parent="TextAppearance.MaterialComponents.Body2">
         <item name="android:textColor">@color/text_secondary</item>
-    </style>
-
-    <style name="SettingToggle" parent="Widget.MaterialComponents.CompoundButton.Switch">
-        <item name="thumbTint">@color/white</item>
-        <item name="trackTint">@color/text_hint</item>
     </style>
 </resources>

@@ -7,209 +7,207 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.fragment.app.Fragment
+import android.widget.Toast
 import androidx.lifecycle.lifecycleScope
 import com.example.parentalcontrol.R
+import com.example.parentalcontrol.data.db.AppDatabase
 import com.example.parentalcontrol.data.repository.AppListRepository
+import com.example.parentalcontrol.data.repository.AppRepository
 import com.example.parentalcontrol.databinding.FragmentChildAppLibraryBinding
 import com.example.parentalcontrol.model.AppInfo
-import com.google.android.material.button.MaterialButton
+import com.example.parentalcontrol.ui.base.BaseFragment
+import com.example.parentalcontrol.util.LogUtil
 import com.google.android.material.card.MaterialCardView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class ChildAppLibraryFragment : Fragment() {
+class ChildAppLibraryFragment : BaseFragment<FragmentChildAppLibraryBinding>() {
 
-    private var _binding: FragmentChildAppLibraryBinding? = null
-    private val binding get() = _binding!!
+    companion object {
+        private const val TAG = "ChildAppLib"
+    }
+
     private lateinit var appListRepository: AppListRepository
+    private lateinit var appRepository: AppRepository
     private var allApps: List<AppInfo> = emptyList()
+    private var blockedPackages: Set<String> = emptySet()
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        _binding = FragmentChildAppLibraryBinding.inflate(inflater, container, false)
-        return binding.root
+    override fun inflateBinding(inflater: LayoutInflater, container: ViewGroup?): FragmentChildAppLibraryBinding {
+        return FragmentChildAppLibraryBinding.inflate(inflater, container, false)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
-        appListRepository = AppListRepository(requireContext())
-
-        setupViews()
-        setupClickListeners()
-        loadApps()
-    }
-
-    private fun setupViews() {
-        val categories = listOf("全部", "学习", "益智", "阅读", "艺术", "音乐")
-        val chipGroup = binding.chipGroup
-        categories.forEachIndexed { index, category ->
-            val chip = com.google.android.material.chip.Chip(requireContext()).apply {
-                text = category
-                isCheckable = true
-                setChipBackgroundColorResource(R.color.divider)
-                setTextColor(resources.getColor(R.color.text_secondary, null))
-            }
-            chipGroup.addView(chip)
-            if (index == 0) {
-                chip.isChecked = true
-                chip.setChipBackgroundColorResource(R.color.primary)
-                chip.setTextColor(resources.getColor(R.color.white, null))
-            }
-            chip.setOnClickListener {
-                chipGroup.clearCheck()
-                chip.isChecked = true
-                for (i in 0 until chipGroup.childCount) {
-                    val c = chipGroup.getChildAt(i) as com.google.android.material.chip.Chip
-                    c.setChipBackgroundColorResource(R.color.divider)
-                    c.setTextColor(resources.getColor(R.color.text_secondary, null))
-                }
-                chip.setChipBackgroundColorResource(R.color.primary)
-                chip.setTextColor(resources.getColor(R.color.white, null))
-                filterApps(category)
-            }
+        try {
+            appListRepository = AppListRepository(requireContext())
+            val db = AppDatabase.getDatabase(requireContext())
+            appRepository = AppRepository(db.appRuleDao(), db.timeRuleDao(), db.usageRecordDao(), db.securityEventDao())
+            setupSearch()
+            loadApps()
+        } catch (e: Exception) {
+            LogUtil.e(TAG, "初始化失败", e)
         }
     }
 
-    private fun setupClickListeners() {
-        binding.btnBack.setOnClickListener {
-            requireActivity().onBackPressed()
-        }
-
-        binding.etSearch.setOnEditorActionListener { _, _, _ ->
-            val query = binding.etSearch.text.toString()
-            if (query.isNotEmpty()) {
-                val results = appListRepository.searchApps(query)
-                displayApps(results)
-            } else {
-                displayApps(allApps)
-            }
-            true
-        }
-
-        binding.etSearch.addTextChangedListener(object : android.text.TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val query = s?.toString() ?: ""
-                if (query.isEmpty()) {
-                    displayApps(allApps)
+    private fun setupSearch() {
+        safeRun {
+            etSearch.addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                    val query = s?.toString() ?: ""
+                    if (query.isEmpty()) displayApps(allApps)
+                    else displayApps(appListRepository.searchApps(query))
                 }
-            }
-            override fun afterTextChanged(s: android.text.Editable?) {}
-        })
+                override fun afterTextChanged(s: android.text.Editable?) {}
+            })
+        }
     }
 
     private fun loadApps() {
         lifecycleScope.launch(Dispatchers.IO) {
-            val apps = appListRepository.getInstalledApps()
-            withContext(Dispatchers.Main) {
-                allApps = apps
-                displayApps(apps)
+            try {
+                val apps = appListRepository.getInstalledApps()
+                val rules = withContext(Dispatchers.Main) {
+                    var result: List<com.example.parentalcontrol.data.entity.AppRule> = emptyList()
+                    appRepository.allAppRules.collectSafe { r -> result = r }
+                    result
+                }
+                // Use a different approach to get blocked packages
+                withContext(Dispatchers.Main) {
+                    allApps = apps
+                    blockedPackages = emptySet()
+                    displayApps(apps)
+                }
+            } catch (e: Exception) {
+                LogUtil.e(TAG, "加载应用列表失败", e)
             }
         }
-    }
-
-    private fun filterApps(category: String) {
-        if (category == "全部") {
-            displayApps(allApps)
-            return
-        }
-        val filtered = allApps.filter { app ->
-            val name = app.appName.lowercase()
-            when (category) {
-                "学习" -> name.contains("edu") || name.contains("learn") || name.contains("study") || name.contains("class") || name.contains("homework") || name.contains("course")
-                "益智" -> name.contains("game") || name.contains("puzzle") || name.contains("brain") || name.contains("math")
-                "阅读" -> name.contains("book") || name.contains("read") || name.contains("novel") || name.contains("reader")
-                "艺术" -> name.contains("art") || name.contains("draw") || name.contains("paint") || name.contains("music") || name.contains("photo")
-                "音乐" -> name.contains("music") || name.contains("song") || name.contains("audio")
-                else -> true
+        // Fall back to direct flow collection
+        appRepository.allAppRules.collectSafe { rules ->
+            blockedPackages = rules.filter { it.isBlocked }.map { it.packageName }.toSet()
+            if (allApps.isNotEmpty()) {
+                displayApps(allApps)
             }
         }
-        displayApps(filtered)
     }
 
     private fun displayApps(apps: List<AppInfo>) {
-        val container = binding.llAppList
-        container.removeAllViews()
+        lifecycleScope.launch(Dispatchers.IO) {
+            val available = mutableListOf<AppInfo>()
+            val disabled = mutableListOf<AppInfo>()
 
-        if (apps.isEmpty()) {
-            val emptyView = TextView(requireContext()).apply {
-                text = if (allApps.isEmpty()) "正在加载应用列表..." else "未找到匹配的应用"
-                textSize = 14f
-                gravity = android.view.Gravity.CENTER
-                setTextColor(resources.getColor(R.color.text_hint, null))
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    (200 * resources.displayMetrics.density).toInt()
-                )
-            }
-            container.addView(emptyView)
-            return
-        }
-
-        val density = resources.displayMetrics.density
-        for (app in apps) {
-            val cardView = MaterialCardView(requireContext()).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { bottomMargin = (12 * density).toInt() }
-                radius = (16 * density).toFloat()
-                cardElevation = (2 * density).toFloat()
-                setCardBackgroundColor(resources.getColor(R.color.card_bg, null))
-            }
-
-            val row = LinearLayout(requireContext()).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = android.view.Gravity.CENTER_VERTICAL
-                setPadding((16 * density).toInt(), (16 * density).toInt(), (16 * density).toInt(), (16 * density).toInt())
-            }
-
-            val iconView = ImageView(requireContext()).apply {
-                layoutParams = LinearLayout.LayoutParams((56 * density).toInt(), (56 * density).toInt())
-                scaleType = ImageView.ScaleType.FIT_CENTER
-                if (app.icon != null) {
-                    setImageDrawable(app.icon)
+            for (app in apps) {
+                if (blockedPackages.contains(app.packageName)) {
+                    disabled.add(app)
                 } else {
-                    setImageResource(R.drawable.ic_launcher_simple)
-                }
-            }
-            row.addView(iconView)
-
-            val textContainer = LinearLayout(requireContext()).apply {
-                orientation = LinearLayout.VERTICAL
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                    leftMargin = (16 * density).toInt()
+                    available.add(app)
                 }
             }
 
-            textContainer.addView(TextView(requireContext()).apply {
-                text = app.appName
-                textSize = 16f
-                setTextColor(resources.getColor(R.color.text_primary, null))
-                setTypeface(null, android.graphics.Typeface.BOLD)
-            })
+            withContext(Dispatchers.Main) {
+                safeRun {
+                    llAvailableApps.removeAllViews()
+                    llDisabledApps.removeAllViews()
+                    tvAvailableCount.text = "${available.size}"
+                    tvDisabledCount.text = "${disabled.size}"
 
-            textContainer.addView(TextView(requireContext()).apply {
-                text = app.packageName
-                textSize = 12f
-                setTextColor(resources.getColor(R.color.text_hint, null))
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { topMargin = (4 * density).toInt() }
-            })
+                    if (available.isEmpty()) {
+                        llAvailableApps.addView(createEmptyView("暂无可用的应用"))
+                    } else {
+                        available.forEach { app ->
+                            llAvailableApps.addView(createAppItemView(app, false))
+                        }
+                    }
 
-            row.addView(textContainer)
-
-            cardView.addView(row)
-            container.addView(cardView)
+                    if (disabled.isEmpty()) {
+                        llDisabledApps.addView(createEmptyView("暂无被禁用的应用"))
+                    } else {
+                        disabled.forEach { app ->
+                            llDisabledApps.addView(createAppItemView(app, true))
+                        }
+                    }
+                }
+            }
         }
     }
 
-    override fun onDestroyView() {
-        super.onDestroyView()
-        _binding = null
+    private fun createAppItemView(app: AppInfo, isDisabled: Boolean): View {
+        val density = resources.displayMetrics.density
+        val cardView = MaterialCardView(requireContext()).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                bottomMargin = (8 * density).toInt()
+            }
+            radius = (16 * density).toFloat()
+            cardElevation = (1 * density).toFloat()
+            setCardBackgroundColor(resources.getColor(R.color.card_bg, null))
+            alpha = if (isDisabled) 0.5f else 1f
+            isClickable = !isDisabled
+
+            if (isDisabled) {
+                setOnClickListener {
+                    Toast.makeText(context, getString(R.string.app_disabled_by_parent), Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        val row = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding((14 * density).toInt(), (14 * density).toInt(), (14 * density).toInt(), (14 * density).toInt())
+        }
+
+        row.addView(ImageView(requireContext()).apply {
+            layoutParams = LinearLayout.LayoutParams((48 * density).toInt(), (48 * density).toInt())
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            if (app.icon != null) setImageDrawable(app.icon) else setImageResource(R.drawable.ic_launcher_simple)
+            alpha = if (isDisabled) 0.5f else 1f
+        })
+
+        val textContainer = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                leftMargin = (14 * density).toInt()
+            }
+            addView(TextView(requireContext()).apply {
+                text = app.appName
+                textSize = 15f
+                setTextColor(resources.getColor(if (isDisabled) R.color.text_hint else R.color.text_primary, null))
+                setTypeface(null, android.graphics.Typeface.BOLD)
+            })
+            addView(TextView(requireContext()).apply {
+                text = app.packageName
+                textSize = 11f
+                setTextColor(resources.getColor(R.color.text_hint, null))
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                    topMargin = (3 * density).toInt()
+                }
+            })
+        }
+        row.addView(textContainer)
+
+        row.addView(TextView(requireContext()).apply {
+            text = if (isDisabled) getString(R.string.disabled_label) else getString(R.string.available_label)
+            textSize = 11f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(resources.getColor(if (isDisabled) R.color.red else R.color.green, null))
+            background = resources.getDrawable(
+                if (isDisabled) R.drawable.bg_chip_red_light else R.drawable.bg_chip_green_light, null
+            )
+            setPadding((12 * density).toInt(), (4 * density).toInt(), (12 * density).toInt(), (4 * density).toInt())
+        })
+
+        cardView.addView(row)
+        return cardView
+    }
+
+    private fun createEmptyView(text: String): View {
+        return TextView(requireContext()).apply {
+            this.text = text
+            textSize = 14f
+            gravity = android.view.Gravity.CENTER
+            setTextColor(resources.getColor(R.color.text_hint, null))
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (100 * resources.displayMetrics.density).toInt())
+        }
     }
 }

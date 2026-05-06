@@ -23,6 +23,7 @@ import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import com.example.parentalcontrol.MainActivity
 import com.example.parentalcontrol.R
+import com.example.parentalcontrol.util.ChildLogUtil
 import com.example.parentalcontrol.util.SettingsManager
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -56,15 +57,28 @@ class ScreenLockOverlayService : Service() {
          * 显示锁屏覆盖
          */
         fun showBlock(context: Context, reason: String = "使用时间已到") {
-            isBlocking = true
-            val intent = Intent(context, ScreenLockOverlayService::class.java).apply {
-                action = "SHOW_BLOCK"
-                putExtra("reason", reason)
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                val overlayPerm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    android.provider.Settings.canDrawOverlays(context)
+                } else true
+                ChildLogUtil.i(TAG, "[霸屏] 显示请求 | reason=$reason | overlayPermission=$overlayPerm | sdkVersion=${Build.VERSION.SDK_INT}")
+                if (!overlayPerm) {
+                    ChildLogUtil.e(TAG, "[霸屏] 启动失败：未获取到悬浮窗权限（SYSTEM_ALERT_WINDOW）")
+                }
+                isBlocking = true
+                val intent = Intent(context, ScreenLockOverlayService::class.java).apply {
+                    action = "SHOW_BLOCK"
+                    putExtra("reason", reason)
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+                ChildLogUtil.i(TAG, "[霸屏] 前台服务启动指令已发送 | action=SHOW_BLOCK")
+            } catch (e: Exception) {
+                ChildLogUtil.e(TAG, "[霸屏] 启动锁屏覆盖失败: ${e.message}", e)
+                isBlocking = false
             }
         }
 
@@ -72,14 +86,20 @@ class ScreenLockOverlayService : Service() {
          * 隐藏锁屏覆盖
          */
         fun hideBlock(context: Context) {
-            isBlocking = false
-            val intent = Intent(context, ScreenLockOverlayService::class.java).apply {
-                action = "HIDE_BLOCK"
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                ChildLogUtil.i(TAG, "[霸屏] 隐藏请求 | wasBlocking=$isBlocking")
+                isBlocking = false
+                val intent = Intent(context, ScreenLockOverlayService::class.java).apply {
+                    action = "HIDE_BLOCK"
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+                ChildLogUtil.i(TAG, "[霸屏] 隐藏指令已发送 | action=HIDE_BLOCK")
+            } catch (e: Exception) {
+                ChildLogUtil.e(TAG, "[霸屏] 隐藏锁屏覆盖失败: ${e.message}", e)
             }
         }
     }
@@ -93,25 +113,36 @@ class ScreenLockOverlayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
-        powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        try {
+            windowManager = getSystemService(WINDOW_SERVICE) as? WindowManager
+            powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            val overlayPerm = hasOverlayPermission()
 
-        setupScreenStateMonitoring()
-        createNotificationChannel()
-        startForeground(NOTIFICATION_ID, createNotification("锁屏服务运行中"))
+            ChildLogUtil.i(TAG, "[霸屏] 锁屏覆盖服务创建 | overlayPermission=$overlayPerm | windowManagerReady=${windowManager != null} | sdkVersion=${Build.VERSION.SDK_INT}")
 
-        Log.d(TAG, "锁屏覆盖服务已创建")
+            setupScreenStateMonitoring()
+            createNotificationChannel()
+            startForeground(NOTIFICATION_ID, createNotification("锁屏服务运行中"))
+
+            ChildLogUtil.i(TAG, "[霸屏] 前台通知已显示 | notificationId=$NOTIFICATION_ID")
+        } catch (e: Exception) {
+            ChildLogUtil.e(TAG, "[霸屏] 服务创建失败: ${e.message}", e)
+            stopSelf()
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
+        ChildLogUtil.d(TAG, "[霸屏] onStartCommand | action=$action | flags=$flags | startId=$startId")
 
         when (action) {
             "SHOW_BLOCK" -> {
                 val reason = intent.getStringExtra("reason") ?: "使用时间已到"
+                ChildLogUtil.i(TAG, "[霸屏] 执行 SHOW_BLOCK | reason=$reason")
                 showBlockingOverlay(reason)
             }
             "HIDE_BLOCK" -> {
+                ChildLogUtil.i(TAG, "[霸屏] 执行 HIDE_BLOCK")
                 hideBlockingOverlay()
                 stopSelf()
             }
@@ -123,23 +154,33 @@ class ScreenLockOverlayService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        ChildLogUtil.i(TAG, "[霸屏] 锁屏覆盖服务销毁 | wasShowing=$isShowingOverlay | wasBlocking=$isBlocking")
         super.onDestroy()
         hideBlockingOverlay()
         stopScreenStateMonitoring()
         isBlocking = false
-        Log.d(TAG, "锁屏覆盖服务已销毁")
+        ChildLogUtil.i(TAG, "[霸屏] 锁屏覆盖服务已销毁，资源已清理")
     }
 
     // ==================== 全屏覆盖 ====================
 
     private fun showBlockingOverlay(reason: String) {
-        if (isShowingOverlay) return
-        if (!hasOverlayPermission()) {
-            Log.w(TAG, "没有悬浮窗权限，无法显示锁屏覆盖")
+        if (isShowingOverlay) {
+            ChildLogUtil.d(TAG, "[霸屏] 覆盖已显示，跳过重复请求 | reason=$reason")
+            return
+        }
+        if (windowManager == null) {
+            ChildLogUtil.e(TAG, "[霸屏] 启动失败：WindowManager 未初始化")
+            return
+        }
+        val overlayPerm = hasOverlayPermission()
+        if (!overlayPerm) {
+            ChildLogUtil.e(TAG, "[霸屏] 启动失败：没有悬浮窗权限（SYSTEM_ALERT_WINDOW 未授权）| 请检查：设置→应用→悬浮窗权限")
             return
         }
 
         try {
+            ChildLogUtil.i(TAG, "[霸屏] 开始创建全屏覆盖 | reason=$reason | overlayPermission=$overlayPerm")
             val inflater = LayoutInflater.from(this)
             blockingView = inflater.inflate(R.layout.service_blocking_layout, null)
 
@@ -155,20 +196,21 @@ class ScreenLockOverlayService : Service() {
 
             // 联系家长按钮
             blockingView?.findViewById<View>(R.id.btnContactParent)?.setOnClickListener {
-                // 发送安全事件到服务器
                 try {
                     val callIntent = Intent(Intent.ACTION_DIAL).apply {
                         data = android.net.Uri.parse("tel:${settingsManager.parentPhone}")
                     }
                     callIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     startActivity(callIntent)
+                    ChildLogUtil.i(TAG, "[霸屏] 儿童点击联系家长 | phone=${settingsManager.parentPhone}")
                 } catch (e: Exception) {
-                    Log.e(TAG, "无法拨打电话: ${e.message}")
+                    ChildLogUtil.e(TAG, "[霸屏] 无法拨打电话: ${e.message}", e)
                 }
             }
 
             // 配置全屏覆盖参数（借鉴 CST）
             setupBlockingView(blockingView!!)
+            ChildLogUtil.i(TAG, "[霸屏] 阻塞视图已配置 | 沉浸式模式+按键拦截+防截图(FLAG_SECURE)")
 
             // 创建窗口参数
             val params = createOverlayParams()
@@ -176,26 +218,33 @@ class ScreenLockOverlayService : Service() {
             isShowingOverlay = true
             isBlocking = true
 
-            Log.d(TAG, "锁屏覆盖已显示: $reason")
+            ChildLogUtil.i(TAG, "[霸屏] 霸屏已启动 | reason=$reason | windowType=${params.type} | 状态：全屏锁定，禁止退出")
 
+        } catch (e: SecurityException) {
+            ChildLogUtil.e(TAG, "[霸屏] 启动失败：安全异常（权限被拒绝）| ${e.message}", e)
+        } catch (e: android.view.WindowManager.BadTokenException) {
+            ChildLogUtil.e(TAG, "[霸屏] 启动失败：窗口Token无效 | ${e.message}", e)
         } catch (e: Exception) {
-            Log.e(TAG, "显示锁屏覆盖失败: ${e.message}")
+            ChildLogUtil.e(TAG, "[霸屏] 启动失败：未知异常 | ${e.message}", e)
         }
     }
 
     private fun hideBlockingOverlay() {
-        if (!isShowingOverlay || blockingView == null) return
+        if (!isShowingOverlay || blockingView == null) {
+            ChildLogUtil.d(TAG, "[霸屏] 未显示覆盖，跳过隐藏")
+            return
+        }
 
         try {
             windowManager?.removeView(blockingView)
+            ChildLogUtil.i(TAG, "[霸屏] 霸屏已解除 | 状态：恢复正常使用")
         } catch (e: Exception) {
-            Log.e(TAG, "移除锁屏覆盖失败: ${e.message}")
+            ChildLogUtil.e(TAG, "[霸屏] 移除锁屏覆盖失败: ${e.message}", e)
         }
 
         blockingView = null
         isShowingOverlay = false
         isBlocking = false
-        Log.d(TAG, "锁屏覆盖已隐藏")
     }
 
     /**
@@ -295,15 +344,16 @@ class ScreenLockOverlayService : Service() {
                 when (intent.action) {
                     Intent.ACTION_SCREEN_ON -> {
                         isScreenOn = true
-                        Log.d(TAG, "屏幕开启")
-                        // 如果应该阻塞但覆盖没显示，重新显示
+                        ChildLogUtil.d(TAG, "[霸屏] 屏幕开启 | isBlocking=$isBlocking | isShowingOverlay=$isShowingOverlay")
+                        // 如果应该阻塞但覆盖没显示（可能被系统杀死），重新显示
                         if (isBlocking && !isShowingOverlay) {
+                            ChildLogUtil.w(TAG, "[霸屏] 检测到霸屏丢失！屏幕开启后覆盖未显示，自动恢复霸屏")
                             showBlockingOverlay("使用时间已到")
                         }
                     }
                     Intent.ACTION_SCREEN_OFF -> {
                         isScreenOn = false
-                        Log.d(TAG, "屏幕关闭")
+                        ChildLogUtil.d(TAG, "[霸屏] 屏幕关闭")
                     }
                 }
             }
@@ -318,9 +368,12 @@ class ScreenLockOverlayService : Service() {
 
     private fun stopScreenStateMonitoring() {
         try {
-            screenReceiver?.let { unregisterReceiver(it) }
+            screenReceiver?.let {
+                unregisterReceiver(it)
+                ChildLogUtil.d(TAG, "[霸屏] 屏幕状态监控已停止")
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "停止屏幕监控失败: ${e.message}")
+            ChildLogUtil.e(TAG, "[霸屏] 停止屏幕监控失败: ${e.message}", e)
         }
     }
 

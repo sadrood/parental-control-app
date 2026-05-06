@@ -14,6 +14,8 @@ import com.example.parentalcontrol.MainActivity
 import com.example.parentalcontrol.R
 import com.example.parentalcontrol.network.AuthManager
 import com.example.parentalcontrol.network.WebSocketManager
+import com.example.parentalcontrol.util.ChildLogUtil
+import com.example.parentalcontrol.util.ParentLogUtil
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import kotlinx.coroutines.launch
@@ -51,6 +53,11 @@ class PairingActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 初始化日志系统
+        ChildLogUtil.init(this)
+        ParentLogUtil.init(this)
+
         setContentView(R.layout.activity_pairing)
 
         authManager = AuthManager.getInstance(this)
@@ -58,14 +65,27 @@ class PairingActivity : AppCompatActivity() {
 
         initViews()
 
+        // 已登录 + 已配对 → 直接进入主页
         if (authManager.isLoggedIn() && authManager.isPaired.value) {
+            val role = authManager.getCurrentUserRole()
+            if (role == "parent") {
+                ParentLogUtil.i(TAG, "[配对] 家长端已配对，直接进入主页 | userId=${authManager.getCurrentUserId()} | pairedWith=${authManager.getPairedWithUserId()}")
+            } else {
+                ChildLogUtil.i(TAG, "[配对] 儿童端已配对，直接进入主页 | userId=${authManager.getCurrentUserId()} | pairedWith=${authManager.getPairedWithUserId()}")
+            }
             enterMainActivity()
             return
         }
 
+        // 已登录但未配对 → 恢复到之前的角色界面
         if (authManager.isLoggedIn()) {
             val role = authManager.getCurrentUserRole()
             if (role != null) {
+                if (role == "parent") {
+                    ParentLogUtil.i(TAG, "[配对] 家长端已登录未配对，显示配对码 | userId=${authManager.getCurrentUserId()}")
+                } else {
+                    ChildLogUtil.i(TAG, "[配对] 儿童端已登录未配对，等待输入配对码 | userId=${authManager.getCurrentUserId()}")
+                }
                 onRoleSelected(role)
             }
         }
@@ -96,6 +116,11 @@ class PairingActivity : AppCompatActivity() {
         btnChild.alpha = if (role == "child") 1f else 0.5f
 
         if (authManager.isLoggedIn() && authManager.getCurrentUserRole() == role) {
+            if (role == "parent") {
+                ParentLogUtil.i(TAG, "[配对] 家长端恢复角色界面 | userId=${authManager.getCurrentUserId()} | pairingCode=${authManager.pairingCode.value}")
+            } else {
+                ChildLogUtil.i(TAG, "[配对] 儿童端恢复角色界面 | userId=${authManager.getCurrentUserId()}")
+            }
             showRoleUI(role)
             return
         }
@@ -108,6 +133,11 @@ class PairingActivity : AppCompatActivity() {
             if (result.isSuccess) {
                 val loginResult = result.getOrNull() ?: return@launch
                 Log.d(TAG, "登录成功: ${loginResult.userId}, role=${loginResult.role}")
+                if (role == "parent") {
+                    ParentLogUtil.i(TAG, "[配对] 家长端登录成功 | userId=${loginResult.userId} | role=${loginResult.role} | pairingCode=${loginResult.pairingCode}")
+                } else {
+                    ChildLogUtil.i(TAG, "[配对] 儿童端登录成功 | userId=${loginResult.userId} | role=${loginResult.role}")
+                }
 
                 webSocketManager.connect(com.example.parentalcontrol.network.ApiClient.WS_URL, loginResult.userId)
                 webSocketManager.bindUser(loginResult.userId, loginResult.token)
@@ -116,6 +146,8 @@ class PairingActivity : AppCompatActivity() {
             } else {
                 val error = result.exceptionOrNull()?.message ?: "登录失败"
                 showStatus(error)
+                val log = if (role == "parent") ParentLogUtil else ChildLogUtil as Any
+                Log.e(TAG, "登录失败: $error")
                 Toast.makeText(this@PairingActivity, "登录失败: $error", Toast.LENGTH_SHORT).show()
             }
         }

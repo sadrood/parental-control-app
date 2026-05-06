@@ -1,78 +1,63 @@
 package com.example.parentalcontrol.ui.parent.profile
 
-import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
-import com.example.parentalcontrol.R
 import com.example.parentalcontrol.databinding.FragmentParentProfileBinding
+import com.example.parentalcontrol.ui.base.BaseFragment
+import com.example.parentalcontrol.util.LogUtil
 import com.example.parentalcontrol.util.SettingsManager
 
-class ParentProfileFragment : Fragment() {
+class ParentProfileFragment : BaseFragment<FragmentParentProfileBinding>() {
 
-    private var _binding: FragmentParentProfileBinding? = null
-    private val binding get() = _binding!!
+    companion object {
+        private const val TAG = "ParentProfile"
+    }
+
     private lateinit var settingsManager: SettingsManager
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        _binding = FragmentParentProfileBinding.inflate(inflater, container, false)
-        return binding.root
+    override fun inflateBinding(inflater: LayoutInflater, container: ViewGroup?): FragmentParentProfileBinding {
+        return FragmentParentProfileBinding.inflate(inflater, container, false)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        settingsManager = SettingsManager(requireContext())
-
-        setupViews()
-        setupClickListeners()
+        try {
+            settingsManager = SettingsManager(requireContext())
+            setupViews()
+            setupClickListeners()
+        } catch (e: Exception) {
+            LogUtil.e(TAG, "初始化失败", e)
+        }
     }
 
     private fun setupViews() {
-        val parentName = settingsManager.parentName
-        if (parentName.isNotEmpty()) {
-            binding.tvParentName.text = parentName
-        }
-        val phone = settingsManager.parentPhone
-        if (phone.isNotEmpty() && phone.length >= 7) {
-            binding.tvParentPhone.text = "${phone.substring(0, 3)} **** ${phone.substring(phone.length - 4)}"
-        } else if (phone.isNotEmpty()) {
-            binding.tvParentPhone.text = phone
+        safeRun {
+            val parentName = settingsManager.parentName
+            if (parentName.isNotEmpty()) tvParentName.text = parentName
+            val phone = settingsManager.parentPhone
+            tvParentPhone.text = when {
+                phone.isNotEmpty() && phone.length >= 7 -> "${phone.substring(0, 3)} **** ${phone.substring(phone.length - 4)}"
+                phone.isNotEmpty() -> phone
+                else -> "未绑定手机号"
+            }
         }
     }
 
     private fun setupClickListeners() {
-        binding.btnBack.setOnClickListener {
-            requireActivity().onBackPressed()
+        safeRun {
+            btnBack.setOnClickListener { requireActivity().onBackPressed() }
+            cardPersonalInfo.setOnClickListener { Toast.makeText(context, "个人资料编辑", Toast.LENGTH_SHORT).show() }
+            cardAccountSecurity.setOnClickListener { Toast.makeText(context, "账号安全设置", Toast.LENGTH_SHORT).show() }
+            cardNotifications.setOnClickListener { Toast.makeText(context, "消息通知设置", Toast.LENGTH_SHORT).show() }
+            cardSubscription.setOnClickListener { Toast.makeText(context, "订阅管理", Toast.LENGTH_SHORT).show() }
+            btnLogout.setOnClickListener {
+                Toast.makeText(context, "已退出登录", Toast.LENGTH_SHORT).show()
+                requireActivity().finish()
+            }
         }
-
-        binding.cardPersonalInfo.setOnClickListener {
-            Toast.makeText(context, "个人资料编辑", Toast.LENGTH_SHORT).show()
-        }
-
-        binding.cardAccountSecurity.setOnClickListener {
-            Toast.makeText(context, "账号安全设置", Toast.LENGTH_SHORT).show()
-        }
-
-        binding.cardNotifications.setOnClickListener {
-            Toast.makeText(context, "消息通知设置", Toast.LENGTH_SHORT).show()
-        }
-
-        binding.cardSubscription.setOnClickListener {
-            Toast.makeText(context, "订阅管理", Toast.LENGTH_SHORT).show()
-        }
-
-        binding.btnLogout.setOnClickListener {
-            Toast.makeText(context, "已退出登录", Toast.LENGTH_SHORT).show()
-            requireActivity().finish()
-        }
-    }
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-        _binding = null
     }
 }

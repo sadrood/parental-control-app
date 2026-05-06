@@ -23,4 +23,5 @@ sealed class SocketEvent {
     data class UsageUpdate(val data: String) : SocketEvent()
     data class SecurityEvent(val data: String) : SocketEvent()
     object SyncRequest : SocketEvent()
+    data class StudyModeCommand(val data: String) : SocketEvent()
 }

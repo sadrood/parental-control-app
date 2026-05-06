@@ -5,100 +5,75 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
-import androidx.fragment.app.Fragment
 import com.example.parentalcontrol.R
 import com.example.parentalcontrol.databinding.FragmentParentSecurityBinding
+import com.example.parentalcontrol.ui.base.BaseFragment
+import com.example.parentalcontrol.util.LogUtil
 import com.example.parentalcontrol.util.SettingsManager
 
-class ParentSecurityFragment : Fragment() {
+class ParentSecurityFragment : BaseFragment<FragmentParentSecurityBinding>() {
 
-    private var _binding: FragmentParentSecurityBinding? = null
-    private val binding get() = _binding!!
+    companion object {
+        private const val TAG = "ParentSecurity"
+    }
+
     private lateinit var settingsManager: SettingsManager
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        _binding = FragmentParentSecurityBinding.inflate(inflater, container, false)
-        return binding.root
+    override fun inflateBinding(inflater: LayoutInflater, container: ViewGroup?): FragmentParentSecurityBinding {
+        return FragmentParentSecurityBinding.inflate(inflater, container, false)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        settingsManager = SettingsManager(requireContext())
-
-        setupViews()
-        setupClickListeners()
+        try {
+            settingsManager = SettingsManager(requireContext())
+            setupViews()
+            setupClickListeners()
+        } catch (e: Exception) {
+            LogUtil.e(TAG, "初始化失败", e)
+        }
     }
 
     private fun setupViews() {
-        binding.switchAntiUninstall.isChecked = settingsManager.antiUninstall
-        binding.switchAntiRoot.isChecked = settingsManager.antiRoot
-        binding.switchTimeTamper.isChecked = settingsManager.timeTamperProof
-        binding.switchScreenshotAudit.isChecked = settingsManager.screenshotAudit
-
-        binding.tvSecurityScore.text = "${settingsManager.securityScore}"
-        updateSecurityStatus()
+        safeRun {
+            switchAntiUninstall.isChecked = settingsManager.antiUninstall
+            switchAntiRoot.isChecked = settingsManager.antiRoot
+            switchTimeTamper.isChecked = settingsManager.timeTamperProof
+            switchScreenshotAudit.isChecked = settingsManager.screenshotAudit
+            tvSecurityScore.text = "${settingsManager.securityScore}"
+            updateSecurityStatus()
+        }
     }
 
     private fun setupClickListeners() {
-        binding.btnBack.setOnClickListener {
-            requireActivity().onBackPressed()
-        }
-
-        binding.switchAntiUninstall.setOnCheckedChangeListener { _, isChecked ->
-            settingsManager.antiUninstall = isChecked
-            updateSecurityStatus()
-        }
-
-        binding.switchAntiRoot.setOnCheckedChangeListener { _, isChecked ->
-            settingsManager.antiRoot = isChecked
-            updateSecurityStatus()
-        }
-
-        binding.switchTimeTamper.setOnCheckedChangeListener { _, isChecked ->
-            settingsManager.timeTamperProof = isChecked
-            updateSecurityStatus()
-        }
-
-        binding.switchScreenshotAudit.setOnCheckedChangeListener { _, isChecked ->
-            settingsManager.screenshotAudit = isChecked
-            updateSecurityStatus()
-        }
-
-        binding.cardFingerprint.setOnClickListener {
-            Toast.makeText(context, "指纹锁功能", Toast.LENGTH_SHORT).show()
-        }
-
-        binding.cardRemoteReset.setOnClickListener {
-            Toast.makeText(context, "远程重置功能", Toast.LENGTH_SHORT).show()
+        safeRun {
+            btnBack.setOnClickListener { requireActivity().onBackPressed() }
+            switchAntiUninstall.setOnCheckedChangeListener { _, _ -> settingsManager.antiUninstall = switchAntiUninstall.isChecked; updateSecurityStatus() }
+            switchAntiRoot.setOnCheckedChangeListener { _, _ -> settingsManager.antiRoot = switchAntiRoot.isChecked; updateSecurityStatus() }
+            switchTimeTamper.setOnCheckedChangeListener { _, _ -> settingsManager.timeTamperProof = switchTimeTamper.isChecked; updateSecurityStatus() }
+            switchScreenshotAudit.setOnCheckedChangeListener { _, _ -> settingsManager.screenshotAudit = switchScreenshotAudit.isChecked; updateSecurityStatus() }
+            cardFingerprint.setOnClickListener { Toast.makeText(context, "指纹锁功能", Toast.LENGTH_SHORT).show() }
+            cardRemoteReset.setOnClickListener { Toast.makeText(context, "远程重置功能", Toast.LENGTH_SHORT).show() }
         }
     }
 
     private fun updateSecurityStatus() {
-        var score = 100
-        if (!settingsManager.antiUninstall) score -= 15
-        if (!settingsManager.antiRoot) score -= 10
-        if (!settingsManager.timeTamperProof) score -= 15
-        if (!settingsManager.screenshotAudit) score -= 5
-
-        settingsManager.securityScore = score
-        binding.tvSecurityScore.text = "$score"
-
-        // 更新状态文字
-        binding.tvAntiUninstallStatus.text = if (settingsManager.antiUninstall) getString(R.string.enabled) else getString(R.string.disabled)
-        binding.tvAntiUninstallStatus.setTextColor(if (settingsManager.antiUninstall) resources.getColor(R.color.success, null) else resources.getColor(R.color.text_hint, null))
-
-        binding.tvAntiRootStatus.text = getString(R.string.safe)
-        binding.tvAntiRootStatus.setTextColor(resources.getColor(R.color.success, null))
-
-        binding.tvTimeTamperStatus.text = if (settingsManager.timeTamperProof) getString(R.string.enabled) else getString(R.string.disabled)
-        binding.tvTimeTamperStatus.setTextColor(if (settingsManager.timeTamperProof) resources.getColor(R.color.success, null) else resources.getColor(R.color.text_hint, null))
-
-        binding.tvScreenshotStatus.text = if (settingsManager.screenshotAudit) getString(R.string.enabled) else getString(R.string.disabled)
-        binding.tvScreenshotStatus.setTextColor(if (settingsManager.screenshotAudit) resources.getColor(R.color.success, null) else resources.getColor(R.color.text_hint, null))
-    }
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-        _binding = null
+        safeRun {
+            var score = 100
+            if (!settingsManager.antiUninstall) score -= 15
+            if (!settingsManager.antiRoot) score -= 10
+            if (!settingsManager.timeTamperProof) score -= 15
+            if (!settingsManager.screenshotAudit) score -= 5
+            settingsManager.securityScore = score
+            tvSecurityScore.text = "$score"
+            tvAntiUninstallStatus.text = if (settingsManager.antiUninstall) getString(R.string.enabled) else getString(R.string.disabled)
+            tvAntiUninstallStatus.setTextColor(resources.getColor(if (settingsManager.antiUninstall) R.color.success else R.color.text_hint, null))
+            tvAntiRootStatus.text = getString(R.string.safe)
+            tvAntiRootStatus.setTextColor(resources.getColor(R.color.success, null))
+            tvTimeTamperStatus.text = if (settingsManager.timeTamperProof) getString(R.string.enabled) else getString(R.string.disabled)
+            tvTimeTamperStatus.setTextColor(resources.getColor(if (settingsManager.timeTamperProof) R.color.success else R.color.text_hint, null))
+            tvScreenshotStatus.text = if (settingsManager.screenshotAudit) getString(R.string.enabled) else getString(R.string.disabled)
+            tvScreenshotStatus.setTextColor(resources.getColor(if (settingsManager.screenshotAudit) R.color.success else R.color.text_hint, null))
+        }
     }
 }

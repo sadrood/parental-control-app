@@ -10,25 +10,35 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
-import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.example.parentalcontrol.R
 import com.example.parentalcontrol.data.db.AppDatabase
 import com.example.parentalcontrol.data.repository.AppRepository
+import com.example.parentalcontrol.data.repository.RepositoryResult
 import com.example.parentalcontrol.databinding.FragmentParentDashboardBinding
 import com.example.parentalcontrol.model.AppUsage
+import com.example.parentalcontrol.network.ApiClient
 import com.example.parentalcontrol.network.AuthManager
+import com.example.parentalcontrol.network.SafeApiCaller
+import com.example.parentalcontrol.network.model.LockScreenRequest
+import com.example.parentalcontrol.network.model.BaseResponse
 import com.example.parentalcontrol.receiver.AdminReceiver
+import com.example.parentalcontrol.ui.base.BaseFragment
 import com.example.parentalcontrol.ui.parent.stats.UsageStatsViewModel
+import com.example.parentalcontrol.util.LogUtil
 import com.example.parentalcontrol.util.SettingsManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-class ParentDashboardFragment : Fragment() {
+class ParentDashboardFragment : BaseFragment<FragmentParentDashboardBinding>() {
 
-    private var _binding: FragmentParentDashboardBinding? = null
-    private val binding get() = _binding!!
+    companion object {
+        private const val TAG = "ParentDash"
+    }
+
     private lateinit var repository: AppRepository
     private lateinit var settingsManager: SettingsManager
     private lateinit var devicePolicyManager: DevicePolicyManager
@@ -36,176 +46,162 @@ class ParentDashboardFragment : Fragment() {
     private lateinit var authManager: AuthManager
     private lateinit var usageStatsViewModel: UsageStatsViewModel
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        _binding = FragmentParentDashboardBinding.inflate(inflater, container, false)
-        return binding.root
+    override fun inflateBinding(inflater: LayoutInflater, container: ViewGroup?): FragmentParentDashboardBinding {
+        return FragmentParentDashboardBinding.inflate(inflater, container, false)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        try {
+            val db = AppDatabase.getDatabase(requireContext())
+            repository = AppRepository(db.appRuleDao(), db.timeRuleDao(), db.usageRecordDao(), db.securityEventDao())
+            settingsManager = SettingsManager(requireContext())
+            devicePolicyManager = requireActivity().getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+            adminComponent = ComponentName(requireContext(), AdminReceiver::class.java)
+            authManager = AuthManager.getInstance(requireContext())
+            usageStatsViewModel = ViewModelProvider(requireActivity())[UsageStatsViewModel::class.java]
 
-        val db = AppDatabase.getDatabase(requireContext())
-        repository = AppRepository(db.appRuleDao(), db.timeRuleDao(), db.usageRecordDao(), db.securityEventDao())
-        settingsManager = SettingsManager(requireContext())
-        devicePolicyManager = requireActivity().getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-        adminComponent = ComponentName(requireContext(), AdminReceiver::class.java)
-        authManager = AuthManager.getInstance(requireContext())
-        usageStatsViewModel = ViewModelProvider(requireActivity())[UsageStatsViewModel::class.java]
-
-        setupViews()
-        setupClickListeners()
-        observeData()
-    }
-
-    private fun setupViews() {
-        binding.tvChildName.text = "${settingsManager.childName}的手机"
+            setupClickListeners()
+            observeData()
+            setupSwipeRefresh()
+        } catch (e: Exception) {
+            LogUtil.e(TAG, "初始化失败", e)
+        }
     }
 
     private fun setupClickListeners() {
-        binding.btnLockScreen.setOnClickListener {
-            lifecycleScope.launch {
-                try {
-                    val apiService = com.example.parentalcontrol.network.ApiClient.getApiService()
-                    val parentId = authManager.getCurrentUserId() ?: return@launch
-                    val response = apiService.lockScreen(
-                        com.example.parentalcontrol.network.model.LockScreenRequest(parentId = parentId)
-                    )
-                    if (response.isSuccessful && response.body()?.success == true) {
-                        Toast.makeText(context, "锁屏指令已发送到儿童端", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(context, "发送失败，请检查网络连接", Toast.LENGTH_SHORT).show()
-                    }
-                } catch (e: Exception) {
-                    Toast.makeText(context, "发送失败: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
+        safeRun {
+            btnLockScreen.setOnClickListener { sendLockCommand(true) }
+            btnUnlock.setOnClickListener { sendLockCommand(false) }
+            btnStudyMode.setOnClickListener { toggleStudyMode() }
+            cardControlSettings.setOnClickListener { findNavController().navigate(R.id.action_dashboard_to_settings) }
+            cardSecurityCenter.setOnClickListener { findNavController().navigate(R.id.action_dashboard_to_security) }
+            tvViewDetails.setOnClickListener { findNavController().navigate(R.id.action_dashboard_to_stats) }
+        }
+    }
+
+    private fun setupSwipeRefresh() {
+        safeRun {
+            swipeRefresh.setOnRefreshListener {
+                usageStatsViewModel.refresh()
+                swipeRefresh.isRefreshing = false
             }
         }
+    }
 
-        binding.btnUnlock.setOnClickListener {
-            lifecycleScope.launch {
-                try {
-                    val apiService = com.example.parentalcontrol.network.ApiClient.getApiService()
-                    val parentId = authManager.getCurrentUserId() ?: return@launch
-                    val response = apiService.unlockScreen(
-                        com.example.parentalcontrol.network.model.LockScreenRequest(parentId = parentId)
-                    )
-                    if (response.isSuccessful && response.body()?.success == true) {
-                        Toast.makeText(context, "解锁指令已发送到儿童端", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(context, "发送失败，请检查网络连接", Toast.LENGTH_SHORT).show()
-                    }
-                } catch (e: Exception) {
-                    Toast.makeText(context, "发送失败: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
+    private fun sendLockCommand(lock: Boolean) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val result = SafeApiCaller.call<BaseResponse>(TAG) {
+                val api = ApiClient.getApiService()
+                val parentId = authManager.getCurrentUserId() ?: throw IllegalStateException("未登录")
+                if (lock) api.lockScreen(LockScreenRequest(parentId))
+                else api.unlockScreen(LockScreenRequest(parentId))
+            }
+            withContext(Dispatchers.Main) {
+                val msg = if (lock) "锁屏指令已发送" else "解锁指令已发送"
+                Toast.makeText(context, if (result is RepositoryResult.Success) "${msg}到儿童端" else "发送失败", Toast.LENGTH_SHORT).show()
             }
         }
+    }
 
-        binding.btnStudyMode.setOnClickListener {
-            if (!isAccessibilityServiceEnabled()) {
-                Toast.makeText(context, "请先开启辅助功能服务", Toast.LENGTH_LONG).show()
-                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-            } else {
-                settingsManager.studyMode = !settingsManager.studyMode
-                val msg = if (settingsManager.studyMode) "学习模式已开启" else "学习模式已关闭"
-                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        binding.cardControlSettings.setOnClickListener {
-            findNavController().navigate(R.id.action_dashboard_to_settings)
-        }
-
-        binding.cardSecurityCenter.setOnClickListener {
-            findNavController().navigate(R.id.action_dashboard_to_security)
-        }
-
-        binding.tvViewDetails.setOnClickListener {
-            findNavController().navigate(R.id.action_dashboard_to_stats)
-        }
-
-        binding.btnSettings.setOnClickListener {
-            findNavController().navigate(R.id.action_dashboard_to_settings)
+    private fun toggleStudyMode() {
+        if (!isAccessibilityServiceEnabled()) {
+            Toast.makeText(context, "请先开启辅助功能服务", Toast.LENGTH_LONG).show()
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        } else {
+            settingsManager.studyMode = !settingsManager.studyMode
+            Toast.makeText(context, if (settingsManager.studyMode) "学习模式已开启" else "学习模式已关闭", Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun observeData() {
-        usageStatsViewModel.remainingTime.observe(viewLifecycleOwner) { remainingMinutes ->
-            binding.tvRemainingTime.text = "$remainingMinutes"
-            binding.tvRemainingUnit.text = "分钟"
-        }
+        usageStatsViewModel.remainingTime.observeSafe { remaining ->
+            safeRun {
+                val hours = remaining / 60
+                val minutes = remaining % 60
+                tvRemainingTime.text = "$hours"
+                tvRemainingMinutes.text = "$minutes"
+                val limit = usageStatsViewModel.dailyLimit.value ?: 60
+                val used = limit - remaining.toInt().coerceAtMost(limit)
+                val pct = if (limit > 0) (used * 100 / limit) else 0
+                progressRemaining.progress = pct
+                tvUsedTime.text = "已用 ${if (used >= 60) "${used / 60}小时${used % 60}分钟" else "${used}分钟"}"
 
-        usageStatsViewModel.appUsageStats.observe(viewLifecycleOwner) { apps ->
-            if (apps.isNotEmpty()) {
-                updateAppStatsFromUsageManager(apps)
-            }
-        }
-
-        lifecycleScope.launch {
-            repository.getDailyAppUsage().collect { usageList ->
-                if (usageList.isNotEmpty()) {
-                    updateAppStats(usageList)
+                when {
+                    remaining <= 30 -> {
+                        progressRemaining.progressDrawable?.setTint(resources.getColor(R.color.red, null))
+                        tvRemainingTime.setTextColor(resources.getColor(R.color.red, null))
+                    }
+                    remaining <= 60 -> {
+                        progressRemaining.progressDrawable?.setTint(resources.getColor(R.color.yellow, null))
+                        tvRemainingTime.setTextColor(resources.getColor(R.color.yellow, null))
+                    }
+                    else -> {
+                        progressRemaining.progressDrawable?.setTint(resources.getColor(R.color.green, null))
+                        tvRemainingTime.setTextColor(resources.getColor(R.color.primary, null))
+                    }
                 }
             }
         }
-    }
 
-    private fun updateAppStats(usageList: List<com.example.parentalcontrol.data.entity.DailyAppUsage>) {
-        if (usageList.isEmpty()) {
-            binding.tvGameTime.text = "0m"
-            binding.tvStudyTime.text = "0m"
-            binding.tvSocialTime.text = "0m"
-            binding.progressGame.progress = 0
-            binding.progressStudy.progress = 0
-            binding.progressSocial.progress = 0
-            return
+        usageStatsViewModel.appUsageStats.observeSafe { apps ->
+            if (apps.isNotEmpty()) {
+                updateAppStats(apps)
+            }
         }
 
-        val totalUsage = usageList.sumOf { it.usageTimeMs }.coerceAtLeast(1)
-
-        val gameApps = usageList.filter { it.category == "游戏" || it.category == "娱乐" }
-        val studyApps = usageList.filter { it.category == "教育" || it.category == "学习" }
-        val socialApps = usageList.filter { it.category == "社交" }
-
-        applyCategoryStats(gameApps.sumOf { it.usageTimeMs }, studyApps.sumOf { it.usageTimeMs }, socialApps.sumOf { it.usageTimeMs }, totalUsage)
+        usageStatsViewModel.childOnlineStatus.observeSafe { online ->
+            safeRun {
+                dotOnlineStatus.background = resources.getDrawable(
+                    if (online) R.drawable.circle_green else R.drawable.circle_red, null
+                )
+                tvOnlineStatus.text = if (online) getString(R.string.child_online_status) else getString(R.string.child_offline_status)
+            }
+        }
     }
 
-    private fun updateAppStatsFromUsageManager(apps: List<AppUsage>) {
-        val pm = requireContext().packageManager
-        val totalUsage = apps.sumOf { it.usageTime }.coerceAtLeast(1)
+    private fun updateAppStats(apps: List<AppUsage>) {
+        lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val pm = requireContext().packageManager
+                val totalUsage = apps.sumOf { it.usageTime }.coerceAtLeast(1)
+                var gameMs = 0L; var studyMs = 0L; var socialMs = 0L
 
-        var gameMs = 0L
-        var studyMs = 0L
-        var socialMs = 0L
+                for (app in apps) {
+                    val appName = try {
+                        pm.getApplicationLabel(pm.getApplicationInfo(app.packageName, 0)).toString()
+                    } catch (e: Exception) { app.packageName }
+                    when (categorizePackage(app.packageName, appName)) {
+                        "游戏", "娱乐" -> gameMs += app.usageTime
+                        "教育", "学习" -> studyMs += app.usageTime
+                        "社交" -> socialMs += app.usageTime
+                    }
+                }
 
-        for (app in apps) {
-            val appName = try {
-                pm.getApplicationLabel(pm.getApplicationInfo(app.packageName, 0)).toString()
+                val totalMs = totalUsage.coerceAtLeast(1)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    safeRun {
+                        tvGameTime.text = formatDuration(gameMs)
+                        tvStudyTime.text = formatDuration(studyMs)
+                        tvSocialTime.text = formatDuration(socialMs)
+                        tvGamePercent.text = "${(gameMs * 100 / totalMs).toInt()}%"
+                        tvStudyPercent.text = "${(studyMs * 100 / totalMs).toInt()}%"
+                        tvSocialPercent.text = "${(socialMs * 100 / totalMs).toInt()}%"
+                        progressGame.progress = (gameMs * 100 / totalMs).toInt()
+                        progressStudy.progress = (studyMs * 100 / totalMs).toInt()
+                        progressSocial.progress = (socialMs * 100 / totalMs).toInt()
+                    }
+                }
             } catch (e: Exception) {
-                app.packageName
-            }
-            val category = categorizePackage(app.packageName, appName)
-            when (category) {
-                "游戏", "娱乐" -> gameMs += app.usageTime
-                "教育", "学习" -> studyMs += app.usageTime
-                "社交" -> socialMs += app.usageTime
+                LogUtil.e(TAG, "更新应用统计失败", e)
             }
         }
-
-        applyCategoryStats(gameMs, studyMs, socialMs, totalUsage)
     }
 
-    private fun applyCategoryStats(gameMs: Long, studyMs: Long, socialMs: Long, totalMs: Long) {
-        val gameMinutes = gameMs / 60000
-        val studyMinutes = studyMs / 60000
-        val socialMinutes = socialMs / 60000
-
-        binding.tvGameTime.text = "${gameMinutes}m"
-        binding.tvStudyTime.text = "${studyMinutes}m"
-        binding.tvSocialTime.text = "${socialMinutes}m"
-
-        binding.progressGame.progress = ((gameMs * 100 / totalMs).toInt())
-        binding.progressStudy.progress = ((studyMs * 100 / totalMs).toInt())
-        binding.progressSocial.progress = ((socialMs * 100 / totalMs).toInt())
+    private fun formatDuration(ms: Long): String {
+        val hours = ms / 3600000
+        val minutes = (ms % 3600000) / 60000
+        return if (hours > 0) "${hours}h${minutes}m" else "${minutes}m"
     }
 
     private fun categorizePackage(packageName: String, appName: String): String {
@@ -218,25 +214,17 @@ class ParentDashboardFragment : Fragment() {
         }
     }
 
-    private fun requestAdminPermission() {
-        val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
-        intent.putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminComponent)
-        intent.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, getString(R.string.admin_description))
-        startActivity(intent)
-    }
-
     private fun isAccessibilityServiceEnabled(): Boolean {
-        val service = "${requireContext().packageName}/${requireContext().packageName}.service.AppControlService"
-        val enabled = Settings.Secure.getInt(requireContext().contentResolver, Settings.Secure.ACCESSIBILITY_ENABLED, 0)
-        if (enabled == 1) {
-            val settingValue = Settings.Secure.getString(requireContext().contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
-            return settingValue?.contains(service) == true
+        return try {
+            val service = "${requireContext().packageName}/${requireContext().packageName}.service.AppControlService"
+            val enabled = Settings.Secure.getInt(requireContext().contentResolver, Settings.Secure.ACCESSIBILITY_ENABLED, 0)
+            if (enabled == 1) {
+                val settingValue = Settings.Secure.getString(requireContext().contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+                settingValue?.contains(service) == true
+            } else false
+        } catch (e: Exception) {
+            LogUtil.e(TAG, "检查辅助功能失败", e)
+            false
         }
-        return false
-    }
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-        _binding = null
     }
 }

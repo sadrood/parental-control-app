@@ -1,22 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary">#1A57DB</color>
-    <color name="primary_dark">#1247B0</color>
-    <color name="primary_light">#E8EEFB</color>
-    <color name="mint">#10B981</color>
-    <color name="mint_dark">#059669</color>
-    <color name="mint_light">#ECFDF5</color>
+    <!-- 主色调：信任蓝 #2196F3 -->
+    <color name="primary">#2196F3</color>
+    <color name="primary_dark">#1976D2</color>
+    <color name="primary_light">#E3F2FD</color>
+    <color name="primary_variant">#1565C0</color>
+
+    <!-- 辅助色 -->
+    <color name="green">#4CAF50</color>
+    <color name="green_dark">#388E3C</color>
+    <color name="green_light">#E8F5E9</color>
+    <color name="yellow">#FFC107</color>
+    <color name="yellow_dark">#FFA000</color>
+    <color name="yellow_light">#FFF8E1</color>
+    <color name="red">#F44336</color>
+    <color name="red_dark">#D32F2F</color>
+    <color name="red_light">#FFEBEE</color>
+
+    <!-- 旧别名保持兼容 -->
+    <color name="mint">#4CAF50</color>
+    <color name="mint_dark">#388E3C</color>
+    <color name="mint_light">#E8F5E9</color>
+    <color name="danger">#F44336</color>
+    <color name="warning">#FFC107</color>
+    <color name="success">#4CAF50</color>
+
+    <!-- 背景和文字 -->
     <color name="background_light">#F8FAFC</color>
     <color name="background_mint">#F0FDF4</color>
-    <color name="secondary_text">#757575</color>
     <color name="text_primary">#1E293B</color>
     <color name="text_secondary">#64748B</color>
     <color name="text_hint">#94A3B8</color>
     <color name="card_bg">#FFFFFF</color>
     <color name="divider">#F1F5F9</color>
-    <color name="danger">#EF4444</color>
-    <color name="warning">#F59E0B</color>
-    <color name="success">#22C55E</color>
+
+    <!-- 图表颜色 -->
+    <color name="chart_blue">#42A5F5</color>
+    <color name="chart_green">#66BB6A</color>
+    <color name="chart_yellow">#FFCA28</color>
+    <color name="chart_red">#EF5350</color>
+    <color name="chart_orange">#FF7043</color>
+    <color name="chart_purple">#AB47BC</color>
+    <color name="chart_teal">#26A69A</color>
+
+    <!-- 基础色 -->
     <color name="purple_200">#FFBB86FC</color>
     <color name="purple_500">#FF6200EE</color>
     <color name="purple_700">#FF3700B3</color>
@@ -24,6 +51,7 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
     <!-- 锁屏覆盖界面颜色 -->
     <color name="lock_background">#1a1a2e</color>
     <color name="lock_header">#3F51B5</color>

@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="oval">
-    <gradient
-        android:type="linear"
-        android:angle="135"
-        android:startColor="#3B82F6"
-        android:endColor="#F97316" />
-</shape>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- White shield icon for notification small icon (alpha-only on API 21+) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,2L4,5v6.09c0,5.05,3.41,9.76,8,10.91c4.59,-1.15,8,-5.86,8,-10.91V5L12,2z" />
+</vector>

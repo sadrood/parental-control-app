@@ -111,10 +111,55 @@
     <string name="per_day">/日</string>
     <string name="remaining">剩余</string>
     <string name="no_data">暂无数据</string>
+    <string name="no_data_syncing">暂无数据，正在同步…</string>
+    <string name="click_retry">点击重试</string>
+    <string name="network_error">网络不可用，请检查连接</string>
     <string name="confirm">确认</string>
     <string name="cancel">取消</string>
     <string name="save">保存</string>
     <string name="delete">删除</string>
     <string name="edit">编辑</string>
     <string name="add">添加</string>
+    <string name="rule_effective">规则已生效</string>
+
+    <!-- 新增：家长首页 -->
+    <string name="child_online_status">儿童端：在线</string>
+    <string name="child_offline_status">儿童端：离线</string>
+    <string name="data_sync_status">数据同步：已同步</string>
+    <string name="data_syncing">数据同步：同步中…</string>
+    <string name="lock_screen_now">一键锁屏</string>
+    <string name="game_category">游戏娱乐</string>
+    <string name="study_category">学习辅导</string>
+    <string name="social_category">社交</string>
+    <string name="parent_rule">今日规则：每日最多%d小时 | 21:00后禁用</string>
+    <string name="less_than_one_hour">不足1小时</string>
+    <string name="app_disabled_by_parent">已被家长禁用</string>
+
+    <!-- 新增：设置 -->
+    <string name="daily_time_limit_hours">每日时长限制：%d小时</string>
+    <string name="night_mode_enabled">夜间禁用：已开启</string>
+    <string name="night_mode_time">21:00–07:00 生效</string>
+    <string name="night_restriction">夜间禁用</string>
+    <string name="night_restriction_desc">开启后在夜间时段禁止使用设备</string>
+
+    <!-- 新增：位置 -->
+    <string name="safe_zone">安全区域</string>
+    <string name="safe_zone_home">家</string>
+    <string name="safe_zone_school">学校</string>
+    <string name="add_safe_zone">添加安全区域</string>
+    <string name="left_safe_zone">已离开安全区域</string>
+    <string name="location_records">最近位置记录</string>
+
+    <!-- 新增：统计 -->
+    <string name="this_week">本周</string>
+    <string name="this_month">本月</string>
+    <string name="category_distribution">应用分类使用占比</string>
+
+    <!-- 新增：应用库 -->
+    <string name="available_apps">可用应用</string>
+    <string name="disabled_apps">已禁用应用</string>
+    <string name="disabled_label">已禁用</string>
+    <string name="available_label">可用</string>
+    <string name="blocked_app">禁用应用</string>
+    <string name="offline">离线</string>
 </resources>

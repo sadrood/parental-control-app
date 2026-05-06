@@ -71,11 +71,13 @@ class SettingsBlockManager(private val context: Context) {
 
         // 扫描节点树判断具体威胁
         val rootNode = event.source ?: return false
-        val reason = scanForThreats(rootNode, packageName)
-
-        Log.d(TAG, "设置页面检查: pkg=$packageName, threat=$reason")
-
-        return reason != null
+        return try {
+            val reason = scanForThreats(rootNode, packageName)
+            Log.d(TAG, "设置页面检查: pkg=$packageName, threat=$reason")
+            reason != null
+        } finally {
+            rootNode.recycle()
+        }
     }
 
     /**
@@ -84,21 +86,31 @@ class SettingsBlockManager(private val context: Context) {
     fun scanForThreats(rootNode: AccessibilityNodeInfo, currentPackageName: String): String? {
         val queue = ArrayDeque<AccessibilityNodeInfo>()
         queue.add(rootNode)
+        val processedNodes = mutableListOf<AccessibilityNodeInfo>()
         var visitedCount = 0
         val MAX_VISITED = 200
 
-        while (queue.isNotEmpty() && visitedCount < MAX_VISITED) {
-            val node = queue.poll() ?: continue
-            visitedCount++
+        try {
+            while (queue.isNotEmpty() && visitedCount < MAX_VISITED) {
+                val node = queue.poll() ?: continue
+                processedNodes.add(node)
+                visitedCount++
 
-            val reason = checkNode(node, currentPackageName)
-            if (reason != null) return reason
+                val reason = checkNode(node, currentPackageName)
+                if (reason != null) return reason
 
-            for (i in 0 until node.childCount) {
-                node.getChild(i)?.let { queue.add(it) }
+                for (i in 0 until node.childCount) {
+                    node.getChild(i)?.let { queue.add(it) }
+                }
+            }
+            return null
+        } finally {
+            for (node in processedNodes) {
+                if (node != rootNode) {
+                    try { node.recycle() } catch (_: Exception) {}
+                }
             }
         }
-        return null
     }
 
     /**
