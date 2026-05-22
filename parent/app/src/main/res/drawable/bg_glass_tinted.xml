@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 有主题色的玻璃卡片 -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#E8F5FB" />
+            <corners android:radius="20dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="135"
+                android:startColor="#20BBDEFB"
+                android:centerColor="#05BBDEFB"
+                android:endColor="#10BBDEFB"
+                android:type="linear" />
+            <corners android:radius="20dp" />
+            <stroke
+                android:width="1dp"
+                android:color="#30BBDEFB" />
+        </shape>
+    </item>
+</layer-list>
